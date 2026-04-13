@@ -1,0 +1,24 @@
+package com.cdac.E_Learning.service;
+
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.cdac.E_Learning.pojo.UserAssignment;
+import com.cdac.E_Learning.repo.IUserAssignmentRepo;
+
+@Service
+public class UserAssignmentService {
+	 @Autowired
+	    private IUserAssignmentRepo userAssignmentRepo;
+
+	    // Method to find UserAssignment by ID
+	    public Optional<UserAssignment> findById(Long userAssignmentId) {
+	        return userAssignmentRepo.findById(userAssignmentId);
+	    }
+	    
+	    public Optional<UserAssignment> getUserAssignment(Long assignmentId, Long userId) {
+	        return userAssignmentRepo.findByAssignmentIdAndUserId(assignmentId, userId);
+	    }
+}

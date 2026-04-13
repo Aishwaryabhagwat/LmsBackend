@@ -1,0 +1,121 @@
+package com.cdac.E_Learning.controller;
+
+import java.io.IOException;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.cdac.E_Learning.dto.APIResponse;
+import com.cdac.E_Learning.dto.EnrollRequestDTO;
+import com.cdac.E_Learning.dto.EnrollmentRequestDTO;
+import com.cdac.E_Learning.pojo.Category;
+import com.cdac.E_Learning.pojo.Course;
+import com.cdac.E_Learning.repo.CategoryRepository;
+import com.cdac.E_Learning.service.ICourseService;
+
+@RestController
+@RequestMapping("/api/course")
+public class CourseController {
+
+    @Autowired
+    private ICourseService courseService;
+    
+    @Autowired
+    private CategoryRepository categoryRepository;
+    
+    
+    @GetMapping("/pending-enrollments")
+    public ResponseEntity<List<EnrollRequestDTO>> getPendingRequests() {
+        return ResponseEntity.ok(courseService.getPendingRequests());
+    }
+
+    @PostMapping("/approve-enrollment")
+    public ResponseEntity<String> approveRequest(@RequestParam Long requestId) {
+    	courseService.approveEnrollmentRequest(requestId);
+        return ResponseEntity.ok("Enrollment request approved");
+    }
+
+    @PostMapping("/reject-enrollment")
+    public ResponseEntity<String> rejectRequest(@RequestParam Long requestId) {
+    	courseService.rejectEnrollmentRequest(requestId);
+        return ResponseEntity.ok("Enrollment request rejected");
+    }
+
+    
+    
+
+    @GetMapping("/getAllCourses")
+    public APIResponse<List<Course>> getAllCourses() {
+        List<Course> course = courseService.getAllCourses();
+        if (!course.isEmpty()) {
+            return new APIResponse<>("success", course, "no error");
+        } else {
+            return new APIResponse<>("error", null, "No course found");
+        }
+    }
+    
+    @GetMapping("/{courseId}/image")
+    public ResponseEntity<APIResponse<String>> getCourseImageUrl(@PathVariable Long courseId) {
+        String imageUrl = courseService.getCourseImageUrl(courseId);
+        if (imageUrl != null) {
+            return ResponseEntity.ok(new APIResponse<>("success", imageUrl, "No error"));
+        } else {
+            return ResponseEntity.ok(new APIResponse<>("error", null, "Image not found for courseId: " + courseId));
+        }
+    }
+
+
+    @GetMapping("/getCourseById/{id}")
+    public ResponseEntity<APIResponse<Course>> getCourseById(@PathVariable Long id) {
+        Course course = courseService.getCourseById(id);
+        if (course != null) {
+            return ResponseEntity.ok(new APIResponse<>("success", course, "Course fetched successfully"));
+        } else {
+            return ResponseEntity.status(404).body(new APIResponse<>("error", null, "Course not found"));
+        }
+    }
+
+//    @PostMapping("/create")
+//    public ResponseEntity<APIResponse<String>> createCourse( @ModelAttribute Course course,
+//    		@RequestParam("imageUrl") MultipartFile imageFile) {
+//        Course createdCourse = courseService.createCourse(course, imageFile);
+//        String message = "course '" + createdCourse.getName() + "' created successfully with ID: " + createdCourse.getId();
+//        return ResponseEntity.ok(new APIResponse<>("success", message, "course created successfully"));
+//    }
+    
+    @PostMapping("/create")
+    public ResponseEntity<APIResponse<String>> createCourse(
+            @RequestParam("name") String name,
+            @RequestParam("description") String description,
+            @RequestParam("author") String author,
+            @RequestParam("categoryId") Long categoryId,
+            @RequestParam("imageFile") MultipartFile imageFile) throws IOException {
+        
+        Course createdCourse = courseService.createCourse(name, description, author, categoryId, imageFile);
+        String message = "course '" + createdCourse.getName() + "' created successfully with ID: " + createdCourse.getId();
+        return ResponseEntity.ok(new APIResponse<>("success", message, "course created successfully"));
+    }
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<APIResponse<String>> updateCourse(
+            @PathVariable Long id,
+            @RequestParam("name") String name,
+            @RequestParam("description") String description,
+            @RequestParam("author") String author,
+            @RequestParam("categoryId") Long categoryId,
+            @RequestParam("imageFile") MultipartFile imageFile) {
+
+        Course updatedCourse = courseService.updateCourse(id, name, description, author, categoryId, imageFile);
+        String message = "Course with ID: " + updatedCourse.getId() + " updated successfully to '" + updatedCourse.getName() + "'";
+        return ResponseEntity.ok(new APIResponse<>("success", message, "Course updated successfully"));
+    }
+
+    @PutMapping("/delete/{id}")
+    public ResponseEntity<APIResponse<String>> deleteCourse(@PathVariable Long id) {
+        courseService.deleteCourse(id);
+        return ResponseEntity.ok(new APIResponse<>("success", "Course deleted successfully", ""));
+    }
+}

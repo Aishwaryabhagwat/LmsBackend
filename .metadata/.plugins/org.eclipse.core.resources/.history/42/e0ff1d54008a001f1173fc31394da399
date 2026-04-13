@@ -1,0 +1,56 @@
+package com.cdac.E_Learning.controller;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.cdac.E_Learning.dto.QuizDTO;
+import com.cdac.E_Learning.pojo.Quiz;
+import com.cdac.E_Learning.service.QuizService;
+
+@RestController
+@RequestMapping("/api/admin/quizzes")
+public class QuizController {
+
+    @Autowired
+    private QuizService quizService;
+
+    /**
+     * Endpoint to add a new quiz with its questions.
+     * 
+     * @param quizDTO the quiz DTO object in the request body
+     * @return ResponseEntity with the created quiz
+     */
+    @PostMapping("/createQuiz")
+    public ResponseEntity<Quiz> addQuiz(@RequestBody QuizDTO quizDTO) {
+        System.out.println("Received QuizDTO: " + quizDTO);
+        Quiz createdQuiz = quizService.addQuiz(quizDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdQuiz);
+    }
+    
+    @PutMapping("/{quizId}/status")
+    public ResponseEntity<Quiz> updateQuizStatus(@PathVariable Long quizId, @RequestParam int isActive) {
+        Quiz updatedQuiz = quizService.updateQuizStatus(quizId, isActive);
+        return ResponseEntity.ok(updatedQuiz);
+    }
+
+    
+    @GetMapping("/getAllQuiz/{courseId}")
+    public ResponseEntity<List<Quiz>> getQuizzesByCourseId(@PathVariable Long courseId) {
+        List<Quiz> quizzes = quizService.getQuizzesByCourseId(courseId);
+        return ResponseEntity.ok(quizzes);
+    }
+
+}
+
+

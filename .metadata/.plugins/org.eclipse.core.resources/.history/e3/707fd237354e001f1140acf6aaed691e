@@ -1,0 +1,112 @@
+package com.cdac.E_Learning.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.cdac.E_Learning.pojo.Assignment;
+import com.cdac.E_Learning.pojo.Course;
+import com.cdac.E_Learning.pojo.User;
+import com.cdac.E_Learning.pojo.UserAssignment;
+import com.cdac.E_Learning.repo.IAssignmentRepo;
+import com.cdac.E_Learning.repo.ICourseRepo;
+import com.cdac.E_Learning.repo.IUserAssignmentRepo;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+
+import javax.persistence.EntityNotFoundException;
+
+@Service
+public class AssignmentServiceImpl implements IAssignmentService {
+
+    @Autowired
+    private IAssignmentRepo assignmentRepo;
+    
+    @Autowired
+    private IUserAssignmentRepo userAssignmentRepo;
+
+    @Autowired
+    private ICourseRepo courseRepo;
+
+    @Override
+    public Assignment createAssignment(String title, MultipartFile file, Long courseId) {
+        Course course = courseRepo.findById(courseId).orElseThrow(() -> new EntityNotFoundException("Course not found"));
+
+        // Save the file to a directory (you can configure this path)
+        String filePath = "E:/work/LMS/udemybackend/E-Learning/assignments/" + file.getOriginalFilename();
+        try {
+            file.transferTo(new File(filePath));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to store file", e);
+        }
+
+        Assignment assignment = new Assignment();
+        assignment.setTitle(title);
+        assignment.setUrl(filePath);
+        assignment.setCourse(course);
+        assignment.setIsActive(1);
+
+        return assignmentRepo.save(assignment);
+    }
+
+    @Override
+    public Assignment updateAssignment(Long assignmentId, String title, MultipartFile file) {
+        Assignment assignment = getAssignmentById(assignmentId);
+
+        // Update assignment metadata
+        assignment.setTitle(title);
+
+        // Update assignment file if provided
+        if (file != null && !file.isEmpty()) {
+            // Delete old assignment file
+            File oldFile = new File(assignment.getUrl());
+            if (oldFile.exists()) {
+                oldFile.delete();
+            }
+
+            // Save new assignment file
+            String filePath = "E:/work/LMS/udemybackend/E-Learning/assignments/" + file.getOriginalFilename();
+            try {
+                file.transferTo(new File(filePath));
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to store file", e);
+            }
+
+            // Update assignment URL
+            assignment.setUrl(filePath);
+        }
+
+        return assignmentRepo.save(assignment);
+    }
+
+    @Override
+    public void deleteAssignment(Long assignmentId) {
+        Assignment assignment = getAssignmentById(assignmentId);
+        if (assignment != null) {
+            assignment.setIsActive(0);
+            assignmentRepo.save(assignment);
+        }
+    }
+
+    @Override
+    public List<Assignment> getActiveAssignmentsByCourseId(Long courseId) {
+        return assignmentRepo.findActiveAssignmentsByCourseId(courseId);
+    }
+
+    @Override
+    public Assignment getAssignmentById(Long assignmentId) {
+        return assignmentRepo.findById(assignmentId).orElseThrow(() -> new EntityNotFoundException("Assignment not found"));
+    }
+    
+
+    
+    @Override
+    public void markAssignmentComplete(Long userId, Long assignmentId) {
+        UserAssignment userAssignment = userAssignmentRepo.findByUserIdAndAssignmentId(userId, assignmentId)
+            .orElseGet(() -> new UserAssignment(new User(userId), new Assignment(assignmentId)));
+        userAssignment.setComplete(true); // Make sure to use the appropriate setter method
+        userAssignmentRepo.save(userAssignment);
+    }
+}

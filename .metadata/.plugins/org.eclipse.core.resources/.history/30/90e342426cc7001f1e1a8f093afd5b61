@@ -1,0 +1,29 @@
+package com.cdac.E_Learning.repo;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import com.cdac.E_Learning.pojo.Question;
+import com.cdac.E_Learning.pojo.Quiz;
+import com.cdac.E_Learning.pojo.QuizOption;
+import com.cdac.E_Learning.pojo.UserQuizResult;
+
+@Repository
+public interface IQuizRepository  extends JpaRepository<Quiz, Long> {
+	 List<Quiz> findByCourseId(Long courseId);
+	   List<Quiz> findByCourseIdAndIsActive(Long courseId, int isActive);
+//	   List<Quiz> findByChapterId(Long chapterId);
+	   List<Quiz> 
+(Long chapterId, int isActive);
+	   
+
+
+	   
+	  
+
+	
+	 
+	
+}

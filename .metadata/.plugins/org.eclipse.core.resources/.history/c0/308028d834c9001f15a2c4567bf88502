@@ -1,0 +1,26 @@
+package com.cdac.E_Learning.dto;
+
+import java.util.List;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class QuizDTO {
+    private String title;
+    private String description;
+    private Long courseId; // Add course ID
+    private Long chapterId;
+    private List<QuestionDTO> questions;
+    private boolean attempted = false; 
+
+    @Getter
+    @Setter
+    public static class QuestionDTO {
+        private String content;
+        private List<String> options;
+        private Integer correctOptionIndex;
+    }
+}
+

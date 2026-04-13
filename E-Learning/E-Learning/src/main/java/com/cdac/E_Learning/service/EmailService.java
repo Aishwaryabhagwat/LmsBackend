@@ -1,0 +1,38 @@
+package com.cdac.E_Learning.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+
+@Service
+public class EmailService {
+
+    @Autowired
+    private JavaMailSender mailSender;
+
+    public void sendEnrollmentApprovalEmail(String toEmail, String username, String courseName) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("Course Enrollment Approved!");
+        message.setText("Hi " + username + ",\n\n" +
+            "Good news! Your request to enroll in \"" + courseName + "\" has been approved.\n\n" +
+            "You can now access the course from your dashboard.\n\n" +
+            "Happy Learning!\n\n" +
+            "Regards,\n" +
+            "HPC-Tech,\n"+ 
+            "CDAC-Pune\n"
+        );
+        
+        try {
+            // Set the 'From' email address
+            message.setFrom("aishwaryab@cdac.in");
+            mailSender.send(message);
+            System.out.println("Email sent successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Failed to send email: " + e.getMessage());
+        }
+    }
+
+}

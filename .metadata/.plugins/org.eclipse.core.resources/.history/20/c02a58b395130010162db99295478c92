@@ -1,0 +1,201 @@
+package com.cdac.E_Learning.service;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.io.File;
+
+import org.omg.CORBA.portable.OutputStream;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+import com.cdac.E_Learning.pojo.Category;
+import com.cdac.E_Learning.pojo.Course;
+import com.cdac.E_Learning.repo.CategoryRepository;
+import com.cdac.E_Learning.repo.ICourseRepo;
+import org.springframework.util.StringUtils; 
+
+import io.jsonwebtoken.lang.Objects;
+
+@Service
+public class CourseServiceImpl implements ICourseService {
+
+    private final ICourseRepo courseRepo;
+    private final CategoryRepository categoryRepo ;
+    
+    @Value("${upload.directory}")
+    private String uploadDirectory;
+    
+    private static final String UPLOAD_DIR = "E:/work/LMS/udemybackend/E-Learning/images/";
+
+
+//    @Autowired
+//    public CourseServiceImpl(ICourseRepo courseRepo, CategoryRepository categoryRepo) {
+//        this.courseRepo = courseRepo;
+//		this.categoryRepo = categoryRepo;
+//		
+    }
+
+    @Override
+    public List<Course> getAllCourses() {
+        return courseRepo.findByIsActive(1);
+    }
+ 
+    @Override
+    public Course getCourseById(Long id) {
+        Optional<Course> course = courseRepo.findById(id);
+        return course.orElse(null);
+    }
+
+  
+
+
+//    @Override
+//    public Course createCourse(String name, String description, String author, Long categoryId, MultipartFile imageFile) {
+//        Course course = new Course();
+//        course.setName(name);
+//        course.setDescription(description);
+//        course.setAuthor(author);
+//        course.setIsActive(1);
+//
+//        Category category = new Category();
+//        category.setId(categoryId);
+//        course.setCategory(category);
+//
+//        if (imageFile != null && !imageFile.isEmpty()) {
+//            try {
+//                String fileName = imageFile.getOriginalFilename();
+//                String filePath = "E:/udemy/backend/udemybackend/E-Learning/images/" + fileName; // Full path to the image file
+//                Path destinationPath = Paths.get(filePath);
+//                Files.copy(imageFile.getInputStream(), destinationPath, StandardCopyOption.REPLACE_EXISTING);
+//                
+//                course.setImageUrl(filePath); // Save the full path as imageUrl
+//            } catch (IOException e) {
+//                throw new RuntimeException("Failed to store image file. Error: " + e.getMessage());
+//            }
+//        }
+//
+//        return courseRepo.save(course);
+//    }
+//    public Course createCourse(String name, String description, String author, Long categoryId, MultipartFile imageFile) throws IOException {
+//        Category category = categoryRepo.findById(categoryId).orElseThrow(() -> new RuntimeException("Category not found"));
+//        Course course = new Course();
+//        course.setName(name);
+//        course.setDescription(description);
+//        course.setAuthor(author);
+//        course.setCategory(category);
+//        course.setIsActive(1); // or some default value
+//
+//        // Save image to some location and store the path in imageUrl
+//        String imageUrl = saveImage(imageFile);
+//        course.setImageUrl(imageUrl);
+//
+//        return courseRepo.save(course);
+//    }
+
+    @Override
+    public Course createCourse(String name, String description, String author, Long categoryId, MultipartFile imageFile) throws IOException {
+    	 Category category = categoryRepo.findById(categoryId).orElseThrow(() -> new RuntimeException("Category not found"));
+    	Course course = new Course();
+        course.setName(name);
+        course.setDescription(description);
+        course.setAuthor(author);
+        course.setCategory(category);
+        course.setIsActive(1);
+        // Save the file locally
+        String fileName = imageFile.getOriginalFilename();
+        Path path = Paths.get(uploadDirectory, fileName);
+        Files.copy(imageFile.getInputStream(), path);
+
+        // Set the image URL
+        course.setImageUrl(path.toString());
+
+        // Save the course in the database
+        return courseRepo.save(course);
+    }
+
+    @Override
+    public String getCourseImageUrl(Long courseId) {
+        Course course = courseRepo.findById(courseId).orElse(null);
+        if (course != null && course.getImageUrl() != null) {
+            return course.getImageUrl();
+        }
+        return null;
+    }
+
+    private String saveImage(MultipartFile imageFile) throws IOException {
+        // Define the path where images will be stored
+        String folder = "E:/work/LMS/udemybackend/E-Learning/images/";
+        byte[] bytes = imageFile.getBytes();
+        Path path = Paths.get(folder + imageFile.getOriginalFilename());
+        Files.write(path, bytes);
+        return path.toString(); // Store path in database
+    }
+    
+
+  
+    
+    @Override
+    public Course updateCourse(Long id, String name, String description, String author, Long categoryId, MultipartFile imageFile) {
+        Optional<Course> courseOpt = courseRepo.findById(id);
+        if (!courseOpt.isPresent()) {
+            throw new IllegalArgumentException("Course with ID: " + id + " not found");
+        }
+        Course existingCourse = courseOpt.get();
+        existingCourse.setName(name);
+        existingCourse.setDescription(description);
+        existingCourse.setAuthor(author);
+
+        if (categoryId != null) {
+            Category category = new Category();
+            category.setId(categoryId);
+            existingCourse.setCategory(category);
+        }
+
+        if (imageFile != null && !imageFile.isEmpty()) {
+            try {
+                String fileName = System.currentTimeMillis() + "_" + imageFile.getOriginalFilename();
+                Path filePath = Paths.get(UPLOAD_DIR + fileName);
+                Files.copy(imageFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+                String imageUrl = ServletUriComponentsBuilder.fromCurrentContextPath().path("/images/").path(fileName).toUriString();
+                existingCourse.setImageUrl(imageUrl);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to store image file. Error: " + e.getMessage());
+            }
+        }
+
+        return courseRepo.save(existingCourse);
+    }
+
+    public void deleteCourse(Long id) {
+        Optional<Course> courseOpt = courseRepo.findById(id);
+        if (!courseOpt.isPresent()) {
+            throw new IllegalArgumentException("Course with ID: " + id + " not found");
+        }
+        Course course = courseOpt.get();
+        course.setIsActive(0);
+        courseRepo.save(course);
+    }
+
+  
+    
+
+
+    // Method to generate unique file name using UUID
+    private String generateUniqueFileName(String originalFileName) {
+        // Generate a unique identifier for the file name
+        String uniqueIdentifier = UUID.randomUUID().toString();
+        // Extract file extension from original file name
+        String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+        // Combine unique identifier and file extension to get unique file name
+        return uniqueIdentifier + fileExtension;
+    }
+}

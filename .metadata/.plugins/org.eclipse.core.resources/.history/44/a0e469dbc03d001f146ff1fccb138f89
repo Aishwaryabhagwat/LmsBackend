@@ -1,0 +1,13 @@
+package com.cdac.E_Learning.service;
+
+import com.cdac.E_Learning.pojo.UserVideoProgress;
+
+import java.util.List;
+
+public interface IUserVideoProgressService {
+    UserVideoProgress recordProgress(Long userId, Long videoId, int progress);
+//    List<UserVideoProgress> getProgressByUserIdAndCourseId(Long userId, Long courseId);
+//    UserVideoProgress getProgressByUserIdAndVideoId(Long userId, Long videoId);
+   
+    double calculateCourseProgress(Long userId, Long courseId);
+}

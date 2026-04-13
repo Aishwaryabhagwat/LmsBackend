@@ -1,0 +1,180 @@
+package com.cdac.E_Learning.controller;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.cdac.E_Learning.dto.APIResponse;
+import com.cdac.E_Learning.dto.AnswerUrlResponse;
+import com.cdac.E_Learning.dto.AssignmentUrlResponse;
+import com.cdac.E_Learning.dto.UserAssignmentResponse;
+import com.cdac.E_Learning.pojo.Assignment;
+import com.cdac.E_Learning.pojo.UserAssignment;
+import com.cdac.E_Learning.repo.IAssignmentRepo;
+import java.util.HashMap;
+import java.util.Map;
+
+
+import com.cdac.E_Learning.service.IAssignmentService;
+import com.cdac.E_Learning.service.UserAssignmentService;
+
+import java.io.File;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+
+import javax.annotation.Resource;
+
+@RestController
+@RequestMapping("/api/assignments")
+public class AssignmentController {
+
+    @Autowired
+    private IAssignmentService assignmentService;
+    
+    @Autowired
+    private IAssignmentRepo assignmentRepo;
+    
+    @Autowired
+    private UserAssignmentService userAssignmentService;
+    
+
+
+    @GetMapping("/course/{courseId}/user/{userId}")
+    public ResponseEntity<List<UserAssignment>> getAssignmentsWithStatus(
+        @PathVariable Long courseId, 
+        @PathVariable Long userId
+    ) {
+        List<UserAssignment> userAssignments = assignmentService.getAssignmentsWithStatus(userId, courseId);
+        return ResponseEntity.ok(userAssignments);
+    }
+
+    @PostMapping("/create")
+    public ResponseEntity<APIResponse<Assignment>> createAssignment(
+            @RequestParam("title") String title,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("courseId") Long courseId) {
+
+        Assignment assignment = assignmentService.createAssignment(title, file, courseId);
+        return ResponseEntity.ok(new APIResponse<>("success", assignment, "Assignment created successfully"));
+    }
+
+    @PutMapping("/update")
+    public ResponseEntity<APIResponse<Assignment>> updateAssignment(
+            @RequestParam("assignmentId") Long assignmentId,
+            @RequestParam("title") String title,
+            @RequestPart(value = "file", required = false) MultipartFile file) {
+
+        Assignment updatedAssignment = assignmentService.updateAssignment(assignmentId, title, file);
+        return ResponseEntity.ok(new APIResponse<>("success", updatedAssignment, "Assignment updated successfully"));
+    }
+
+    @DeleteMapping("/delete/{assignmentId}")
+    public ResponseEntity<APIResponse<String>> deleteAssignment(@PathVariable Long assignmentId) {
+        assignmentService.deleteAssignment(assignmentId);
+        return ResponseEntity.ok(new APIResponse<>("success", "Assignment deleted successfully", "no error"));
+    }
+
+    @GetMapping("/activeAssignment/{courseId}")
+    public ResponseEntity<APIResponse<List<Assignment>>> getActiveAssignmentsByCourseId(@PathVariable Long courseId) {
+        List<Assignment> assignments = assignmentService.getActiveAssignmentsByCourseId(courseId);
+        return ResponseEntity.ok(new APIResponse<>("success", assignments, "Assignments retrieved successfully"));
+    }
+    
+    @GetMapping("/{assignmentId}")
+    public ResponseEntity<AssignmentUrlResponse> getAssignmentById(@PathVariable Long assignmentId) {
+    	 // Retrieve Note entity from database based on assignmentId
+        Optional<Assignment> assignmentOptional = assignmentRepo.findById(assignmentId);
+        if (assignmentOptional.isPresent()) {
+        	 String filePath = assignmentOptional.get().getUrl();
+        	 
+        	 String url = "http://localhost:8080/assignments/" + new File(filePath).getName();
+        	 AssignmentUrlResponse response = new AssignmentUrlResponse(url);
+            return ResponseEntity.ok(response);
+        }else {
+            return ResponseEntity.notFound().build();
+        }
+
+
+   
+        }
+    
+    
+    @PutMapping("/markComplete")
+    public ResponseEntity<APIResponse<String>> markAssignmentComplete(
+            @RequestParam("userId") Long userId,
+            @RequestParam("assignmentId") Long assignmentId) {
+        assignmentService.markAssignmentComplete(userId, assignmentId);
+        return ResponseEntity.ok(new APIResponse<>("success", "Assignment marked as complete", "no error"));
+    }
+    
+    @GetMapping("/getAssignment/{courseId}")
+    public List<UserAssignmentResponse> getAssignments(@PathVariable Long courseId, @RequestParam Long userId) {
+        return assignmentService.getAssignmentsForCourse(courseId, userId);
+    }
+    
+    
+    @PostMapping("/uploadAnswer")
+    public ResponseEntity<APIResponse<String>> uploadAssignmentAnswer(
+            @RequestParam("userId") Long userId,
+            @RequestParam("assignmentId") Long assignmentId,
+            @RequestParam("answerFile") MultipartFile answerFile) {
+
+        // Call the service method to handle the answer file upload
+        assignmentService.uploadAssignmentAnswer(userId, assignmentId, answerFile);
+
+        return ResponseEntity.ok(new APIResponse<>("success", "Answer uploaded successfully", "no error"));
+    }
+    
+    @GetMapping("/answers/{userAssignmentId}")
+    public ResponseEntity<AnswerUrlResponse> getAnswerFileUrl(@PathVariable Long userAssignmentId) {
+        // Retrieve UserAssignment entity from the database based on userAssignmentId
+        Optional<UserAssignment> userAssignmentOptional = userAssignmentService.findById(userAssignmentId);
+        if (userAssignmentOptional.isPresent()) {
+            UserAssignment userAssignment = userAssignmentOptional.get();
+            
+            String filePath = userAssignment.getAnswerFileUrl();
+            
+            // Generate the file URL to be returned
+            String url = "http://localhost:8080/answers/" + new File(filePath).getName();
+            AnswerUrlResponse response = new AnswerUrlResponse(url);
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+    
+    @GetMapping("/{assignmentId}/{userId}")
+    public ResponseEntity<UserAssignment> getUserAssignment(@PathVariable Long assignmentId, @PathVariable Long userId) {
+        Optional<UserAssignment> userAssignment = userAssignmentService.getUserAssignment(assignmentId, userId);
+        return userAssignment.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+    
+    @GetMapping("/user-answers")
+    public ResponseEntity<List<UserAssignmentWithUrlResponse>> getAllUserAnswers() {
+        List<UserAssignment> userAssignments = userAssignmentService.getAllUserAnswers();
+        
+        List<UserAssignmentWithUrlResponse> response = userAssignments.stream().map(userAssignment -> {
+            // Generate URL for each user's answer file
+            String filePath = userAssignment.getAnswerFileUrl();
+            String baseUrl = "http://localhost:8080/api/answers/";  // Your base URL for serving files
+            String fileName = new File(filePath).getName();
+            String fileUrl = baseUrl + fileName;
+            
+            // Create DTO with the answer URL
+            return new UserAssignmentWithUrlResponse(
+                userAssignment.getId(),
+                userAssignment.getUser().getUsername(),
+                userAssignment.getAssignment().getTitle(),
+                fileUrl
+            );
+        }).collect(Collectors.toList());
+        
+        return ResponseEntity.ok(response);
+    }
+
+    
+}

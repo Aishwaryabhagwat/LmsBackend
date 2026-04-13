@@ -1,0 +1,65 @@
+package com.cdac.E_Learning.service;
+
+import com.cdac.E_Learning.pojo.User;
+import com.cdac.E_Learning.repo.IUserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class UserServiceImpl implements IUserService {
+    private final IUserRepository userRepository;
+   
+    private final PasswordEncoder passwordEncoder;
+
+    @Autowired
+    public UserServiceImpl(IUserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+		
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    private void checkUsernameExists(String username) {
+        Optional<User> existingUser = userRepository.findByUsername(username);
+        if (existingUser.isPresent()) {
+            throw new IllegalArgumentException("Username already exists");
+        }
+    }
+
+    @Override
+    public User createUser(User user) {
+        checkUsernameExists(user.getUsername());
+        String encryptedPassword = passwordEncoder.encode(user.getPassword());
+        user.setPassword(encryptedPassword);
+        user.setRoles(Arrays.asList("ROLE_USER"));
+        user.setIsActive(1);
+        return userRepository.save(user);
+    }
+
+    @Override
+    public User createAdmin(User user) {
+    	checkUsernameExists(user.getUsername());
+        String encryptedPassword = passwordEncoder.encode(user.getPassword());
+        user.setPassword(encryptedPassword);
+        user.setRoles(Arrays.asList("ROLE_ADMIN"));
+        user.setIsActive(1);
+        return userRepository.save(user);
+    }
+    
+    @Override
+    public List<User> getActiveUsers() {
+        return userRepository.findByIsActive(1);
+    }
+    
+    @Override
+    public User getUserByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+    
+   
+}

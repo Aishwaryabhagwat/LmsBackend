@@ -1,0 +1,368 @@
+package com.cdac.E_Learning.service;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.cdac.E_Learning.dto.QuestionDTO;
+import com.cdac.E_Learning.dto.QuizDTO;
+import com.cdac.E_Learning.dto.QuizSubmissionRequest;
+import com.cdac.E_Learning.exception.ResourceNotFoundException;
+import com.cdac.E_Learning.pojo.Chapter;
+import com.cdac.E_Learning.pojo.Course;
+import com.cdac.E_Learning.pojo.Question;
+import com.cdac.E_Learning.pojo.Quiz;
+import com.cdac.E_Learning.pojo.QuizOption;
+import com.cdac.E_Learning.pojo.User;
+import com.cdac.E_Learning.pojo.UserAnswer;
+import com.cdac.E_Learning.pojo.UserQuizResult;
+import com.cdac.E_Learning.repo.IChapterRepo;
+import com.cdac.E_Learning.repo.ICourseRepo;
+import com.cdac.E_Learning.repo.IQuestionRepo;
+import com.cdac.E_Learning.repo.IQuizRepository;
+import com.cdac.E_Learning.repo.IUserRepository;
+import com.cdac.E_Learning.repo.QuizOptionRepository;
+import com.cdac.E_Learning.repo.UserQuizResultRepository;
+
+@Service
+public class QuizService {
+
+	@Autowired
+	private IQuizRepository quizRepository;
+	
+	@Autowired
+	 private  ICourseRepo courseRepo;
+	
+	  @Autowired
+	    private IChapterRepo chapterRepository;
+	
+	 @Autowired
+	    private IUserRepository userRepository; 
+	 
+	 @Autowired
+	    private IQuestionRepo questionRepository;
+	 
+	 @Autowired
+	 private QuizOptionRepository quizOptionRepository;
+	 
+	 @Autowired
+	    private UserQuizResultRepository userQuizResultRepository;
+
+	public Quiz addQuiz(QuizDTO quizDTO) {
+	    Quiz quiz = new Quiz();
+	    quiz.setTitle(quizDTO.getTitle());
+	    quiz.setDescription(quizDTO.getDescription());
+	    quiz.setIsActive(1); 
+
+	    
+	    
+	    
+	    
+	    
+	    // Retrieve course by ID
+	    Course course = courseRepo.getCourseById(quizDTO.getCourseId());
+	    
+	    // Check if course is null
+	    if (course == null) {
+	        throw new RuntimeException("Course not found with ID: " + quizDTO.getCourseId());
+	    }
+	    
+	    quiz.setCourse(course); // Set the course
+
+	    
+	    Chapter chapter = chapterRepository.findById(quizDTO.getChapterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Chapter not found with id: " + quizDTO.getChapterId()));
+        quiz.setChapter(chapter);
+	   
+	 // Convert DTO questions to entities
+	    List<Question> questions = quizDTO.getQuestions().stream().map(q -> {
+	        Question question = new Question();
+	        question.setContent(q.getContent());
+	        question.setIsActive(1); // Assuming you want to set it as active
+	        question.setQuiz(quiz);  // Set the quiz reference
+
+	        // Map options
+	        List<QuizOption> options = q.getOptions().stream().map(o -> {
+	            QuizOption option = new QuizOption();
+	            option.setText(o);
+	            option.setQuestion(question); // Set the question reference here
+	            return option;
+	        }).collect(Collectors.toList());
+
+	        question.setOptions(options);
+	        question.setCorrectOptionIndex(q.getCorrectOptionIndex());
+	        return question;
+	    }).collect(Collectors.toList());
+
+	    quiz.setQuestions(questions);
+
+	    // Fetch all users from the database
+        List<User> allUsers = userRepository.findAll();
+
+        // Assign all users to the quiz
+        quiz.setUsers(allUsers);
+
+	    return quizRepository.save(quiz);
+	}
+
+	  public Quiz updateQuizStatus(Long quizId, int isActive) {
+	        // Retrieve the quiz by ID
+	        Quiz quiz = quizRepository.findById(quizId)
+	                .orElseThrow(() -> new RuntimeException("Quiz not found with ID: " + quizId));
+
+	        // Update the isActive status
+	        quiz.setIsActive(isActive);
+
+	        // Save the updated quiz
+	        return quizRepository.save(quiz);
+	    }
+	  public List<Quiz> getQuizzesByCourseId(Long courseId) {
+	        return quizRepository.findByCourseId(courseId);
+	    }
+	  
+	  
+	  public List<Quiz> getActiveQuizzesByCourseId(Long courseId) {
+	        return quizRepository.findByCourseIdAndIsActive(courseId, 1); // 1 for active quizzes
+	    }
+	  
+	  
+	   public List<Question> getQuestionsByQuizId(Long quizId) {
+	        // Fetch the quiz by its ID, ensuring the quiz exists
+	        Quiz quiz = quizRepository.findById(quizId)
+	                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with id: " + quizId));
+
+	        // Fetch all active questions (isActive = 1) associated with this quiz
+	        return questionRepository.findByQuizIdAndIsActive(quizId, 1);
+	    }
+
+	  
+	   public void deleteQuestion(Long questionId) throws Exception {
+		   Optional<Question> question = questionRepository.findById(questionId);
+	        
+	        if (question.isPresent()) {
+	            Question existingQuestion = question.get();
+	            existingQuestion.setIsActive(0);  // Setting the isActive field to 0 for deactivation
+	            questionRepository.save(existingQuestion);  // Save the updated question
+	        } else {
+	            throw new Exception("Question not found with id: " + questionId);
+	        }
+	    }
+	   
+	   
+	   public void addQuestion(Long quizId, QuestionDTO questionDTO) {
+	        // Fetch the quiz by its ID
+	        Quiz quiz = quizRepository.findById(quizId)
+	                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with id: " + quizId));
+
+	        // Create a new Question entity
+	        Question question = new Question();
+	        question.setContent(questionDTO.getContent());
+	        question.setCorrectOptionIndex(questionDTO.getCorrectOptionIndex());
+	        question.setIsActive(1); // Set status to active (assuming 1 is active)
+
+	        // Set the relation with the quiz
+	        question.setQuiz(quiz);
+
+	        // Save the question first to get the generated ID
+	        questionRepository.save(question);
+
+	        // Map options
+	        List<QuizOption> options = questionDTO.getOptions().stream().map(optionText -> {
+	            QuizOption option = new QuizOption();
+	            option.setText(optionText);
+	            option.setQuestion(question); // Set the question reference here
+	            return option;
+	        }).collect(Collectors.toList());
+
+	        // Save the options
+	  
+	        quizOptionRepository.saveAll(options);  /// Save all options associated with the question
+	    }
+	   
+	   
+	   
+	   public void updateQuestion(Long questionId, QuestionDTO questionDTO) {
+		    // Fetch the question by its ID
+		    Question question = questionRepository.findById(questionId)
+		            .orElseThrow(() -> new ResourceNotFoundException("Question not found with id: " + questionId));
+
+		    // Update question content and correct option index
+		    question.setContent(questionDTO.getContent());
+		    question.setCorrectOptionIndex(questionDTO.getCorrectOptionIndex());
+		    
+		    // Update the options
+		    List<QuizOption> options = quizOptionRepository.findByQuestionId(questionId);
+
+		    // Ensure options length matches the input
+		    if (options.size() != questionDTO.getOptions().size()) {
+		        throw new IllegalArgumentException("The number of options provided does not match existing options.");
+		    }
+
+		    // Update each option's text
+		    for (int i = 0; i < options.size(); i++) {
+		        options.get(i).setText(questionDTO.getOptions().get(i));
+		    }
+
+		    // Save the updated question and options
+		    questionRepository.save(question);
+		    quizOptionRepository.saveAll(options);
+		}
+
+	   
+	   public QuestionDTO getQuestionById(Long questionId) {
+	        Question question = questionRepository.findById(questionId)
+	            .orElseThrow(() -> new ResourceNotFoundException("Question not found with id: " + questionId));
+
+	        // Fetch the related options
+	        List<QuizOption> options = quizOptionRepository.findByQuestionId(questionId);
+
+	        // Map the data to QuestionDTO
+	        QuestionDTO questionDTO = new QuestionDTO();
+	       
+	        questionDTO.setContent(question.getContent());
+	        questionDTO.setCorrectOptionIndex(question.getCorrectOptionIndex());
+
+	        List<String> optionTexts = options.stream()
+	            .map(QuizOption::getText)
+	            .collect(Collectors.toList());
+	        questionDTO.setOptions(optionTexts);
+
+	        return questionDTO;
+	    }
+	   
+	   //user
+	   public UserQuizResult saveOrUpdateQuizResult(QuizSubmissionRequest submissionRequest) {
+		    // Retrieve the user and quiz
+		    User user = userRepository.findById(submissionRequest.getUser().getId())
+		            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + submissionRequest.getUser().getId()));
+
+		    Quiz quiz = quizRepository.findById(submissionRequest.getQuizId())
+		            .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with id: " + submissionRequest.getQuizId()));
+
+		    // Calculate the total questions and correct answers
+		    int totalQuestions = submissionRequest.getUserAnswers().size();
+		    int correctAnswers = 0;
+
+		    for (UserAnswer userAnswer : submissionRequest.getUserAnswers()) {
+		        // Retrieve the question
+		        Question question = questionRepository.findById(userAnswer.getQuestion().getId())
+		                .orElseThrow(() -> new ResourceNotFoundException("Question not found with id: " + userAnswer.getQuestion().getId()));
+
+		        // Debugging: Log selected and correct option indexes
+		        System.out.println("Question ID: " + question.getId());
+		        System.out.println("Selected Option Index: " + userAnswer.getSelectedOptionIndex());
+		        System.out.println("Correct Option Index: " + question.getCorrectOptionIndex());
+
+		        // Increment correctAnswers only if both indexes are not null and match
+		        Integer selectedOptionIndex = userAnswer.getSelectedOptionIndex();
+		        Integer correctOptionIndex = question.getCorrectOptionIndex();
+		        if (selectedOptionIndex != null && selectedOptionIndex.equals(correctOptionIndex)) {
+		            correctAnswers++;
+		        }
+		    }
+
+
+int score = (int) ((correctAnswers / (double) totalQuestions) * 100); // Calculate score as a percentage
+		    // Create a UserQuizResult instance and set its fields
+		    UserQuizResult userQuizResult = new UserQuizResult();
+		    userQuizResult.setUser(user);
+		    userQuizResult.setQuiz(quiz);
+		    userQuizResult.setCorrectAnswers(correctAnswers);
+		    userQuizResult.setQuiz(quiz);
+		    userQuizResult.setTotalQuestions(totalQuestions);
+		    userQuizResult.setCompleted(true);
+		    userQuizResult.setSubmittedAt(new Date());
+		    
+		    System.out.println(userQuizResult);
+
+		    // Save the result and return
+		    return userQuizResultRepository.save(userQuizResult);
+		}
+
+
+
+	   
+//	   private int calculateScore(QuizSubmissionRequest submissionRequest) {
+//		    // Logic to calculate score based on user's answers
+//		    int score = 0;
+//		    List<Question> questions = questionRepository.findByQuizId(submissionRequest.getQuizId());
+//		    for (UserAnswer userAnswer : submissionRequest.getUserAnswers()) {
+//		        Question question = questions.stream()
+//		                .filter(q -> q.getId().equals(userAnswer.getQuestion()))
+//		                .findFirst()
+//		                .orElse(null);
+//		        if (question != null && question.getCorrectOptionIndex() == userAnswer.getSelectedOptionIndex()) {
+//		            score++;
+//		        }
+//		    }
+//		    return score;
+//		}
+	   
+	   public UserQuizResult getLatestResult(Long quizId, Long userId) {
+		    return userQuizResultRepository.findByQuizIdAndUserId(quizId, userId)
+		            .orElse(null);
+		}
+
+	
+	    public UserQuizResult calculateResult(QuizSubmissionRequest submissionRequest) {
+	        User user = userRepository.findById(submissionRequest.getUser().getId())
+	                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + submissionRequest.getUser().getId()));
+	        
+	        Quiz quiz = quizRepository.findById(submissionRequest.getQuizId())
+	                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with id: " + submissionRequest.getQuizId()));
+
+	        int totalQuestions = submissionRequest.getUserAnswers().size();
+	        int correctAnswers = 0;
+
+	        for (UserAnswer userAnswer : submissionRequest.getUserAnswers()) {
+	            Question question = questionRepository.findById(userAnswer.getQuestion().getId())
+	                    .orElseThrow(() -> new ResourceNotFoundException("Question not found with id: " + userAnswer.getQuestion().getId()));
+
+	            // Check if the selected option is correct
+	            if (userAnswer.getSelectedOptionIndex() == question.getCorrectOptionIndex()) {
+	                correctAnswers++;
+	            }
+	        }
+
+	        int score = (int) ((correctAnswers / (double) totalQuestions) * 100); // Calculate score as a percentage
+
+	        UserQuizResult quizResult = new UserQuizResult();
+	        quizResult.setUser(user);
+	        quizResult.setQuiz(quiz);
+	        quizResult.setTotalQuestions(totalQuestions);
+	        quizResult.setCorrectAnswers(correctAnswers);
+	        quizResult.setScore(score);
+	        quizResult.setCompleted(true);
+
+	        return userQuizResultRepository.save(quizResult);
+	    }
+	   
+	    
+	    public boolean isQuizAttempted(Long userId, Long quizId) {
+	        return userQuizResultRepository.existsByUserIdAndQuizIdAndIsCompleted(userId, quizId);
+	    }
+	    
+	    public boolean isQuizAttemptedByUser(Long quizId, Long userId) {
+	        return userQuizResultRepository.findByQuizIdAndUserId(quizId, userId).isPresent();
+	    }
+	    
+	 // Method to fetch the quiz result for a user
+	    public UserQuizResult getUserQuizResult(Long userId, Long quizId) {
+	        return userQuizResultRepository.findUserQuizResultByUserIdAndQuizId(userId, quizId);
+	    }
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    }
+
+	

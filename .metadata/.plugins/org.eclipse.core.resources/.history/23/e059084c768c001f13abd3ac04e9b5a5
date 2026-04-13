@@ -1,0 +1,160 @@
+package com.cdac.E_Learning.service;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.cdac.E_Learning.dto.QuestionDTO;
+import com.cdac.E_Learning.dto.QuizDTO;
+import com.cdac.E_Learning.exception.ResourceNotFoundException;
+import com.cdac.E_Learning.pojo.Course;
+import com.cdac.E_Learning.pojo.Question;
+import com.cdac.E_Learning.pojo.Quiz;
+import com.cdac.E_Learning.pojo.QuizOption;
+import com.cdac.E_Learning.pojo.User;
+import com.cdac.E_Learning.repo.ICourseRepo;
+import com.cdac.E_Learning.repo.IQuestionRepo;
+import com.cdac.E_Learning.repo.IQuizRepository;
+import com.cdac.E_Learning.repo.IUserRepository;
+
+@Service
+public class QuizService {
+
+	@Autowired
+	private IQuizRepository quizRepository;
+	
+	@Autowired
+	 private  ICourseRepo courseRepo;
+	
+	 @Autowired
+	    private IUserRepository userRepository; 
+	 
+	 @Autowired
+	    private IQuestionRepo questionRepository;
+	 
+	 @Autorwired
+	 private IQuizOptionRepo quizOptionRepository
+
+	public Quiz addQuiz(QuizDTO quizDTO) {
+	    Quiz quiz = new Quiz();
+	    quiz.setTitle(quizDTO.getTitle());
+	    quiz.setDescription(quizDTO.getDescription());
+	    quiz.setIsActive(1); 
+
+	    // Retrieve course by ID
+	    Course course = courseRepo.getCourseById(quizDTO.getCourseId());
+	    
+	    // Check if course is null
+	    if (course == null) {
+	        throw new RuntimeException("Course not found with ID: " + quizDTO.getCourseId());
+	    }
+	    
+	    quiz.setCourse(course); // Set the course
+
+	   
+	 // Convert DTO questions to entities
+	    List<Question> questions = quizDTO.getQuestions().stream().map(q -> {
+	        Question question = new Question();
+	        question.setContent(q.getContent());
+	        question.setIsActive(1); // Assuming you want to set it as active
+	        question.setQuiz(quiz);  // Set the quiz reference
+
+	        // Map options
+	        List<QuizOption> options = q.getOptions().stream().map(o -> {
+	            QuizOption option = new QuizOption();
+	            option.setText(o);
+	            option.setQuestion(question); // Set the question reference here
+	            return option;
+	        }).collect(Collectors.toList());
+
+	        question.setOptions(options);
+	        question.setCorrectOptionIndex(q.getCorrectOptionIndex());
+	        return question;
+	    }).collect(Collectors.toList());
+
+	    quiz.setQuestions(questions);
+
+	    // Fetch all users from the database
+        List<User> allUsers = userRepository.findAll();
+
+        // Assign all users to the quiz
+        quiz.setUsers(allUsers);
+
+	    return quizRepository.save(quiz);
+	}
+
+	  public Quiz updateQuizStatus(Long quizId, int isActive) {
+	        // Retrieve the quiz by ID
+	        Quiz quiz = quizRepository.findById(quizId)
+	                .orElseThrow(() -> new RuntimeException("Quiz not found with ID: " + quizId));
+
+	        // Update the isActive status
+	        quiz.setIsActive(isActive);
+
+	        // Save the updated quiz
+	        return quizRepository.save(quiz);
+	    }
+	  public List<Quiz> getQuizzesByCourseId(Long courseId) {
+	        return quizRepository.findByCourseId(courseId);
+	    }
+	  
+	  
+	  
+	   public List<Question> getQuestionsByQuizId(Long quizId) {
+	        // Fetch the quiz by its ID, ensuring the quiz exists
+	        Quiz quiz = quizRepository.findById(quizId)
+	                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with id: " + quizId));
+
+	        // Fetch all active questions (isActive = 1) associated with this quiz
+	        return questionRepository.findByQuizIdAndIsActive(quizId, 1);
+	    }
+
+	  
+	   public void deleteQuestion(Long questionId) throws Exception {
+		   Optional<Question> question = questionRepository.findById(questionId);
+	        
+	        if (question.isPresent()) {
+	            Question existingQuestion = question.get();
+	            existingQuestion.setIsActive(0);  // Setting the isActive field to 0 for deactivation
+	            questionRepository.save(existingQuestion);  // Save the updated question
+	        } else {
+	            throw new Exception("Question not found with id: " + questionId);
+	        }
+	    }
+	   
+	   
+	   public void addQuestion(Long quizId, QuestionDTO questionDTO) {
+	        // Fetch the quiz by its ID
+	        Quiz quiz = quizRepository.findById(quizId)
+	                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with id: " + quizId));
+
+	        // Create a new Question entity
+	        Question question = new Question();
+	        question.setContent(questionDTO.getContent());
+	        question.setCorrectOptionIndex(questionDTO.getCorrectOptionIndex());
+	        question.setIsActive(1); // Set status to active (assuming 1 is active)
+
+	        // Set the relation with the quiz
+	        question.setQuiz(quiz);
+
+	        // Save the question first to get the generated ID
+	        questionRepository.save(question);
+
+	        // Map options
+	        List<QuizOption> options = questionDTO.getOptions().stream().map(optionText -> {
+	            QuizOption option = new QuizOption();
+	            option.setText(optionText);
+	            option.setQuestion(question); // Set the question reference here
+	            return option;
+	        }).collect(Collectors.toList());
+
+	        // Save the options
+	  
+	        quizOptionRepository.saveAll(options);  /// Save all options associated with the question
+	    }
+	    }
+
+	

@@ -1,0 +1,79 @@
+package com.cdac.E_Learning.service;
+
+import com.cdac.E_Learning.pojo.Chapter;
+import com.cdac.E_Learning.pojo.User;
+import com.cdac.E_Learning.pojo.Video;
+import com.cdac.E_Learning.repo.IChapterRepo;
+import com.cdac.E_Learning.repo.IUserRepository;
+import com.cdac.E_Learning.repo.IUserVideoProgressRepo;
+import com.cdac.E_Learning.repo.IVideoRepo;
+import com.cdac.E_Learning.pojo.UserVideoProgress;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javax.persistence.EntityNotFoundException;
+
+@Service
+public class UserVideoProgressServiceImpl implements IUserVideoProgressService {
+
+    @Autowired
+    private IUserVideoProgressRepo userVideoProgressRepo;
+
+    @Autowired
+    private IUserRepository userRepo;
+
+    @Autowired
+    private IVideoRepo videoRepo;
+    @Autowired
+    private IChapterRepo chapterRepo;
+
+    @Override
+    public UserVideoProgress recordProgress(Long userId, Long videoId, int progress) {
+        User user = userRepo.findById(userId).orElseThrow(() -> new EntityNotFoundException("User not found"));
+        Video video = videoRepo.findById(videoId).orElseThrow(() -> new EntityNotFoundException("Video not found"));
+
+        Optional<UserVideoProgress> existingProgressOpt = userVideoProgressRepo.findByUserIdAndVideoId(userId, videoId);
+        UserVideoProgress userVideoProgress;
+
+        if (existingProgressOpt.isPresent()) {
+            userVideoProgress = existingProgressOpt.get();
+            userVideoProgress.setCompletedDuration(progress);;
+        } else {
+            userVideoProgress = new UserVideoProgress();
+            userVideoProgress.setUser(user);
+            userVideoProgress.setVideo(video);
+            userVideoProgress.setCompletedDuration(progress);
+        }
+
+        return userVideoProgressRepo.save(userVideoProgress); 
+    }
+
+    @Override
+    public List<UserVideoProgress> getProgressByUserIdAndCourseId(Long userId, Long courseId) {
+        return userVideoProgressRepo.findByUserIdAndVideoChapterCourseId(userId, courseId);
+    }
+
+    @Override
+    public UserVideoProgress getProgressByUserIdAndVideoId(Long userId, Long videoId) {
+        return userVideoProgressRepo.findByUserIdAndVideoId(userId, videoId)
+                .orElseThrow(() -> new EntityNotFoundException("Progress not found for this user and video"));
+    }
+    
+    @Override
+    public double calculateCourseProgress(Long userId, Long courseId) {
+        List<UserVideoProgress> progressList = getProgressByUserIdAndCourseId(userId, courseId);
+        double totalDuration = progressList.stream().mapToInt(p -> p.getVideo().getDuration()).sum();
+        double completedDuration = progressList.stream().mapToInt(UserVideoProgress::getCompletedDuration).sum();
+
+        double progressPercentage = (completedDuration / totalDuration) * 100;
+        return Math.round(progressPercentage);
+    }
+}

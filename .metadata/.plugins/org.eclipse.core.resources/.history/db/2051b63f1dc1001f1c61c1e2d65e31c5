@@ -1,0 +1,40 @@
+package com.cdac.E_Learning.pojo;
+
+import java.util.List;
+import javax.persistence.*;
+
+import lombok.Getter;
+import lombok.Setter;
+
+
+@Entity
+@Getter
+@Setter
+public class Quiz extends BaseEntity {
+
+    private String title;
+    private String description;
+
+    @Column(nullable = false)
+    private int isActive; // 0: Inactive, 1: Active
+
+    @ManyToOne
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
+
+    @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Question> questions;
+
+    @ManyToMany
+    @JoinTable(
+        name = "UserQuiz",
+        joinColumns = @JoinColumn(name = "quiz_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private List<User> users; // Users assigned to take this quiz
+    
+    @ManyToOne
+    @JoinColumn(name = "chapter_id", nullable = false)
+    private Chapter chapter;
+
+}

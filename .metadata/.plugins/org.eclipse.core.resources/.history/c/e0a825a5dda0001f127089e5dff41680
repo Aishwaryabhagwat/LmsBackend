@@ -1,0 +1,157 @@
+package com.cdac.E_Learning.controller;
+
+import java.util.*;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import com.cdac.E_Learning.dto.APIResponse;
+import com.cdac.E_Learning.dto.QuestionDTO;
+import com.cdac.E_Learning.dto.QuizDTO;
+import com.cdac.E_Learning.dto.QuizSubmissionRequest;
+import com.cdac.E_Learning.exception.ResourceNotFoundException;
+import com.cdac.E_Learning.pojo.Question;
+import com.cdac.E_Learning.pojo.Quiz;
+import com.cdac.E_Learning.pojo.UserQuizResult;
+import com.cdac.E_Learning.service.QuizService;
+
+@RestController
+@RequestMapping("/api/admin/quizzes")
+@CrossOrigin(origins = "http://localhost:4200")
+public class QuizController {
+
+    @Autowired
+    private QuizService quizService;
+
+
+    
+    @PostMapping("/createQuiz")
+    public ResponseEntity<APIResponse<Quiz>> addQuiz(@RequestBody QuizDTO quizDTO) {
+        try {
+            System.out.println("Received QuizDTO: " + quizDTO);
+            Quiz createdQuiz = quizService.addQuiz(quizDTO);
+
+            // Returning a success response with the created quiz data
+            APIResponse<Quiz> response = new APIResponse<>("success", createdQuiz, "no error");
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            // Handle any exceptions that occur, return error message
+            APIResponse<Quiz> response = new APIResponse<>("error", null, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
+    
+    @PutMapping("/{quizId}/status")
+    public ResponseEntity<Quiz> updateQuizStatus(@PathVariable Long quizId, @RequestParam int isActive) {
+        Quiz updatedQuiz = quizService.updateQuizStatus(quizId, isActive);
+        return ResponseEntity.ok(updatedQuiz);
+    }
+
+    
+    @GetMapping("/getAllQuiz/{courseId}")
+    public ResponseEntity<List<Quiz>> getQuizzesByCourseId(@PathVariable Long courseId) {
+        List<Quiz> quizzes = quizService.getQuizzesByCourseId(courseId);
+        return ResponseEntity.ok(quizzes);
+    }
+    
+    @GetMapping("/getAllActiveQuizzes/{courseId}")
+    public ResponseEntity<List<Quiz>> getActiveQuizzesByCourseId(@PathVariable Long courseId) {
+        List<Quiz> activeQuizzes = quizService.getActiveQuizzesByCourseId(courseId);
+        
+        return ResponseEntity.ok(activeQuizzes);
+    }
+
+    
+    @GetMapping("/questionByQuizId/{quizId}")
+    public ResponseEntity<APIResponse<List<Question>>> getQuestionsByQuizId(@PathVariable Long quizId) {
+        try {
+            List<Question> questions = quizService.getQuestionsByQuizId(quizId);
+            if (questions == null) {
+                questions = new ArrayList<>(); // Ensure it's not null
+            }
+            return ResponseEntity.ok(new APIResponse<>("success", questions, null));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new APIResponse<>("error", null, e.getMessage()));
+        }
+    }
+
+    
+    @PostMapping("/addQuestions/{quizId}")
+    public ResponseEntity<APIResponse<String>> addQuestion(
+            @PathVariable Long quizId, @RequestBody QuestionDTO questionDTO) {
+        try {
+            quizService.addQuestion(quizId, questionDTO);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(new APIResponse<>("success", "Question added successfully", null));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new APIResponse<>("error", null, e.getMessage()));
+        }
+    }
+
+
+    @DeleteMapping("/{questionId}")
+    public ResponseEntity<APIResponse<String>> deleteQuestion(@PathVariable Long questionId) {
+        try {
+            quizService.deleteQuestion(questionId);
+            return ResponseEntity.ok(new APIResponse<>("success", "Question deleted successfully", null));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new APIResponse<>("error", null, e.getMessage()));
+        }
+    }
+
+    @PutMapping("/editQuestion/{questionId}")
+    public ResponseEntity<APIResponse<String>> editQuestion(
+            @PathVariable Long questionId, @RequestBody QuestionDTO questionDTO) {
+        try {
+            // Call service to update the question
+            quizService.updateQuestion(questionId, questionDTO);
+            return ResponseEntity.status(HttpStatus.OK)
+                    .body(new APIResponse<>("success", "Question updated successfully", null));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new APIResponse<>("error", null, e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new APIResponse<>("error", null, e.getMessage()));
+        }
+    }
+
+    
+    // Get a question by its ID
+    @GetMapping("/getQuestion/{questionId}")
+    public ResponseEntity<QuestionDTO> getQuestionById(@PathVariable Long questionId) {
+        QuestionDTO questionDTO = quizService.getQuestionById(questionId);
+        return ResponseEntity.ok(questionDTO);
+    }
+
+    //user
+    @PostMapping("/submit")
+    public ResponseEntity<UserQuizResult> submitQuiz(@RequestBody QuizSubmissionRequest submissionRequest) {
+        UserQuizResult result = quizService.calculateResult(submissionRequest);
+        return ResponseEntity.ok(result);
+    }
+ 
+    
+    @GetMapping("/attempted-status")
+    public boolean isQuizAttempted(
+            @RequestParam("userId") Long userId,
+            @RequestParam("quizId") Long quizId) {
+        return quizService.isQuizAttempted(userId, quizId);
+    }
+}
+
+
